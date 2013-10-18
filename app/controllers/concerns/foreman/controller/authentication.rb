@@ -26,7 +26,6 @@ module Foreman::Controller::Authentication
           session[:original_uri] = request.fullpath
           @available_sso ||= SSO::Base.new(self)
 
-          return if @available_sso.login_url == request.fullpath
           (redirect_to @available_sso.login_url and return) unless @available_sso.has_rendered
         end
 
@@ -49,10 +48,6 @@ module Foreman::Controller::Authentication
     authenticate
   end
 
-  def optional_login
-    authenticate or redirect_to login_users_path
-  end
-
   def is_admin?
     return true unless SETTINGS[:login]
     return true if User.current && User.current.admin?
@@ -69,7 +64,12 @@ module Foreman::Controller::Authentication
       elsif available_sso.support_login?
         available_sso.authenticate!
       else
-        logger.warn("SSO failed, falling back to login form")
+        logger.warn("SSO failed")
+        if available_sso.support_fallback? && !available_sso.has_rendered
+          logger.warn("falling back to login form")
+          available_sso.has_rendered = true
+          redirect_to login_users_path
+        end
       end
     end
 
