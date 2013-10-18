@@ -135,6 +135,25 @@ class User < ActiveRecord::Base
     user
   end
 
+  def self.find_or_create_external_user(login, auth_source_name)
+    if (user = unscoped.find_by_login(login))
+      return true
+    elsif not auth_source_name
+      return false
+    else
+      User.as :admin do
+        auth_source = AuthSource.find_by_name auth_source_name
+        if not auth_source
+          auth_source = AuthSourceExternal.new(:name => auth_source_name)
+          auth_source.save!
+        end
+        user = User.new(:login => login, :auth_source => auth_source)
+        user.save!
+      end
+      return true
+    end
+  end
+
   def matching_password?(pass)
     self.password_hash == encrypt_password(pass)
   end
