@@ -138,12 +138,12 @@ class User < ActiveRecord::Base
   def self.find_or_create_external_user(login, auth_source_name)
     if (user = unscoped.find_by_login(login))
       return true
-    elsif not auth_source_name
+    elsif auth_source_name.nil?
       return false
     else
       User.as :admin do
         auth_source = AuthSource.find_by_name auth_source_name
-        if not auth_source
+        if auth_source.nil?
           auth_source = AuthSourceExternal.new(:name => auth_source_name)
           auth_source.save!
         end
