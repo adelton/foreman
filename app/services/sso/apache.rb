@@ -20,9 +20,23 @@ module SSO
 
     # If REMOTE_USER is provided by the web server then
     # authenticate the user without using password.
+    ENV_TO_ATTR_MAPPING = {
+      'REMOTE_USER_EMAIL' => :mail,
+      'REMOTE_USER_FIRSTNAME' => :firstname,
+      'REMOTE_USER_LASTNAME' => :lastname,
+    }
     def authenticated?
       return false unless (self.user = request.env[CAS_USERNAME])
-      return false unless User.find_or_create_external_user(self.user, Setting['authorize_login_delegation_auth_source_user_autocreate'])
+      attrs = { :login => self.user }
+      ENV_TO_ATTR_MAPPING.each do |k, v|
+        if request.env.has_key?(k)
+          attrs[v] = request.env[k].dup.force_encoding(Encoding::UTF_8)
+          if not attrs[v].valid_encoding?
+            attrs[v] = attrs[v].encode(Encoding::ISO_8859_1, Encoding::UTF_8, {:invalid => :replace, :replace => '-'}).force_encoding(Encoding::UTF_8)
+          end
+        end
+      end
+      return false unless User.find_or_create_external_user(attrs, Setting['authorize_login_delegation_auth_source_user_autocreate'])
       store
       true
     end
