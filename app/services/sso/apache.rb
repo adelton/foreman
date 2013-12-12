@@ -1,3 +1,5 @@
+require 'iconv' if RUBY_VERSION.start_with?('1.8.')
+
 module SSO
   class Apache < Base
     delegate :session, :to => :controller
@@ -32,7 +34,11 @@ module SSO
         if request.env.has_key?(k)
           attrs[v] = request.env[k].dup.force_encoding(Encoding::UTF_8)
           if not attrs[v].valid_encoding?
-            attrs[v] = attrs[v].encode(Encoding::ISO_8859_1, Encoding::UTF_8, {:invalid => :replace, :replace => '-'}).force_encoding(Encoding::UTF_8)
+            if attrs[v].respond_to? :force_encoding
+              attrs[v] = attrs[v].encode(Encoding::ISO_8859_1, Encoding::UTF_8, {:invalid => :replace, :replace => '-'}).force_encoding(Encoding::UTF_8)
+            else
+              attrs[v] = Iconv.new('UTF-8//IGNORE', 'UTF-8').iconv(attrs[v]) rescue attrs[v]
+            end
           end
         end
       end
