@@ -148,8 +148,7 @@ class User < ActiveRecord::Base
       User.as :admin do
         options = { :name => auth_source_name }
         auth_source = AuthSource.where(options).first || AuthSourceExternal.create!(options)
-        attrs[:auth_source] = auth_source
-        user = User.create!(attrs)
+        user = User.create!(attrs.merge(:auth_source => auth_source))
         user.post_successful_login
       end
       return true

@@ -5,6 +5,12 @@ module SSO
     delegate :session, :to => :controller
 
     CAS_USERNAME = 'REMOTE_USER'
+    ENV_TO_ATTR_MAPPING = {
+        'REMOTE_USER_EMAIL'     => :mail,
+        'REMOTE_USER_FIRSTNAME' => :firstname,
+        'REMOTE_USER_LASTNAME'  => :lastname,
+    }
+
     def available?
       return false unless Setting['authorize_login_delegation']
       return false if controller.api_request? and not Setting['authorize_login_delegation_api']
@@ -22,26 +28,9 @@ module SSO
 
     # If REMOTE_USER is provided by the web server then
     # authenticate the user without using password.
-    ENV_TO_ATTR_MAPPING = {
-      'REMOTE_USER_EMAIL' => :mail,
-      'REMOTE_USER_FIRSTNAME' => :firstname,
-      'REMOTE_USER_LASTNAME' => :lastname,
-    }
     def authenticated?
       return false unless (self.user = request.env[CAS_USERNAME])
-      attrs = { :login => self.user }
-      ENV_TO_ATTR_MAPPING.each do |k, v|
-        if request.env.has_key?(k)
-          attrs[v] = request.env[k].dup.force_encoding(Encoding::UTF_8)
-          if not attrs[v].valid_encoding?
-            if attrs[v].respond_to? :force_encoding
-              attrs[v] = attrs[v].encode(Encoding::ISO_8859_1, Encoding::UTF_8, {:invalid => :replace, :replace => '-'}).force_encoding(Encoding::UTF_8)
-            else
-              attrs[v] = Iconv.new('UTF-8//IGNORE', 'UTF-8').iconv(attrs[v]) rescue attrs[v]
-            end
-          end
-        end
-      end
+      attrs = { :login => self.user }.merge(additional_attributes)
       return false unless User.find_or_create_external_user(attrs, Setting['authorize_login_delegation_auth_source_user_autocreate'])
       store
       true
@@ -69,6 +58,26 @@ module SSO
     end
 
     private
+
+    def additional_attributes
+      attrs = {}
+      ENV_TO_ATTR_MAPPING.each do |header, attribute|
+        if request.env.has_key?(header)
+          value = request.env[header].dup
+          value = convert_encoding(value) unless value.valid_encoding?
+          attrs[attribute] = value
+        end
+      end
+      attrs
+    end
+
+    def convert_encoding(value)
+      if value.respond_to?(:force_encoding)
+        value.encode(Encoding::UTF_8, Encoding::ISO_8859_1, { :invalid => :replace, :replace => '-' }).force_encoding(Encoding::UTF_8)
+      else
+        Iconv.new('UTF-8//IGNORE', 'UTF-8').iconv(value) rescue value
+      end
+    end
 
     def store
       session[:sso_method] = self.class.to_s
