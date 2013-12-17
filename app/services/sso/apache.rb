@@ -63,9 +63,7 @@ module SSO
       attrs = {}
       ENV_TO_ATTR_MAPPING.each do |header, attribute|
         if request.env.has_key?(header)
-          value = request.env[header].dup
-          value = convert_encoding(value) unless value.valid_encoding?
-          attrs[attribute] = value
+          attrs[attribute] = convert_encoding(request.env[header].dup)
         end
       end
       attrs
@@ -73,10 +71,14 @@ module SSO
 
     def convert_encoding(value)
       if value.respond_to?(:force_encoding)
-        value.encode(Encoding::UTF_8, Encoding::ISO_8859_1, { :invalid => :replace, :replace => '-' }).force_encoding(Encoding::UTF_8)
+        value.force_encoding(Encoding::UTF_8)
+        if not value.valid_encoding?
+          value.encode(Encoding::UTF_8, Encoding::ISO_8859_1, { :invalid => :replace, :replace => '-' }).force_encoding(Encoding::UTF_8)
+        end
       else
         Iconv.new('UTF-8//IGNORE', 'UTF-8').iconv(value) rescue value
       end
+      value
     end
 
     def store
