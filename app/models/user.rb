@@ -204,7 +204,9 @@ class User < ActiveRecord::Base
       User.as :admin do
         options = { :name => auth_source_name }
         auth_source = AuthSource.where(options).first || AuthSourceExternal.create!(options)
+        groups = attrs.delete(:groups)
         user = User.create!(attrs.merge(:auth_source => auth_source))
+        user.usergroups<< groups if groups.present?
         user.post_successful_login
       end
       return true
