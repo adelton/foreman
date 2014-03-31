@@ -397,6 +397,15 @@ class UserTest < ActiveSupport::TestCase
     assert_equal 'foobar@example.com', user.mail
     assert_equal 'Foo', user.firstname
     assert_equal 'Bar', user.lastname
+
+    # with existing user groups that are assigned
+    apache_source = AuthSourceExternal.find_or_create_by_name('apache_module')
+    usergroup = FactoryGirl.create :usergroup
+    assert User.find_or_create_external_user({:login => 'not_existing_user_4',
+                                              :groups => [usergroup]},
+                                             apache_source.name)
+    user = User.find_by_login('not_existing_user_4')
+    assert_equal [usergroup], user.usergroups
   end
 
 
